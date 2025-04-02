@@ -250,7 +250,8 @@ endif
 # Define include paths for required headers
 # NOTE: Several external required libraries (stb and others)
 INCLUDE_PATHS = -I. -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external
-INCLUDE_PATHS += player.c world.c shaders.c
+INCLUDE_PATHS += 
+
 
 # Define additional directories containing required header files
 ifeq ($(PLATFORM),PLATFORM_RPI)

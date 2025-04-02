@@ -10,6 +10,10 @@
 	},
 	"files.associations": {
 		"world.h": "c",
-		"raylib.h": "c"
+		"raylib.h": "c",
+		"shaders.h": "c",
+		"cstdlib": "c",
+		"memory_resource": "c",
+		"memory": "c"
 	}
 }

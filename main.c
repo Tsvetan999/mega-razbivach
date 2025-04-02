@@ -1,13 +1,17 @@
 #include "raylib.h"
 #include "rlgl.h"
-#include "player.h"
-#include "world.h"
-#include "shaders.h"
 #include "raymath.h"
+#include "stdlib.h"
 
 #define SCREEN_WIDTH 1680
 #define SCREEN_HEIGHT 960
 #define FPS 144
+
+struct cube_model {
+    Mesh mesh;
+    Model model;
+    Vector3 position;
+};
 
 int main() {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "My First Game");
@@ -15,54 +19,56 @@ int main() {
 
     DisableCursor();
 
-    Player player;
-    InitPlayer(&player);
-    World world;
-    InitWorld(&world);
-    LightingShader shader;
-    InitLightingShader(&shader);
-    for (int i = 0; i < world.model.materialCount; i++) {
-        world.model.materials[i].shader = shader.shader;
+    int n = 5; 
+
+    struct cube_model *cube_array;
+    cube_array = (struct cube_model*) malloc(n * sizeof(struct cube_model));
+
+    cube_array[0].mesh = GenMeshCube(50.0f, 2.0f, 50.0f);
+    cube_array[0].model = LoadModelFromMesh(cube_array[0].mesh);
+    cube_array[0].position.x = 0.0f;
+    cube_array[0].position.y = -1.0f;
+    cube_array[0].position.z = 0.0f;
+    cube_array[0].model.transform = MatrixTranslate(cube_array[0].position.x, cube_array[0].position.y, cube_array[0].position.z);
+
+    for (size_t i = 1; i < n; i++) {
+        cube_array[i].mesh = GenMeshCube(3.0f, 10.0f, 5.0f);
+        cube_array[i].model = LoadModelFromMesh(cube_array[i].mesh);
+        cube_array[i].position = (Vector3){4.0f * i, 0.0f, 2.0f * i}; 
+        cube_array[i].model.transform = MatrixTranslate(cube_array[i].position.x, cube_array[i].position.y, cube_array[i].position.z);
     }
-
-    Mesh cube_mesh = GenMeshCube(100.0f, 2.0f, 100.0f);
-    Model cube_model = LoadModelFromMesh(cube_mesh);
-    Vector3 cube_position = {0.0f, -1.0f, 0.0f};
     
-    cube_model.transform = MatrixTranslate(cube_position.x, cube_position.y, cube_position.z);
-
-    // Camera3D camera = { 0 };
-    //camera.position = (Vector3){ 0.0f, 2.0f, 5.0f };
-    //camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
-    //camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
-    //camera.fovy = 45.0f;
-    //camera.projection = CAMERA_PERSPECTIVE;
-
-
-    Vector3 lightPos = (Vector3){ 10.0, 10.0, 0.0f };
     
+    WHITE;
+    Camera3D camera = { 0 };
+    camera.position = (Vector3){ 0.0f, 2.0f, 5.0f };
+    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
+    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+    camera.fovy = 45.0f;
+    camera.projection = CAMERA_PERSPECTIVE;
+
     rlDisableBackfaceCulling();
+    
     while (!WindowShouldClose()) {
-        UpdatePlayer(&player, &cube_model);
 
 
-        ApplyLightingShader(&shader, &cube_model, lightPos, player.camera.position);    
-        UpdateCamera(&player.camera, CAMERA_FIRST_PERSON);
+        //ApplyLightingShader(&shader, &cube_model1, &cube_model2, lightPos, player.camera.position);    
+        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
         BeginDrawing();
         ClearBackground(SKYBLUE);
-        BeginMode3D(player.camera);
-        DrawWorld(&world);
-        DrawModel(cube_model, (Vector3){0}, 1.0f, WHITE);
+        BeginMode3D(camera);
+        for (size_t i = 0; i < n; i++)
+        {
+            DrawModel(cube_array[i].model, (Vector3){0}, 1.0f, (Color){13 * i, 13 * i, 13 * i, 255});
+        }
+        
         DrawGrid(10, 1.0f);
       
         EndMode3D();
         DrawFPS(10, 10);
-        DrawText(TextFormat("Grounded: %d", player.isGrounded), 10, 30, 20, GRAY);
         EndDrawing();
     }
 
-    UnloadWorld(&world);
-    UnloadLightingShader(&shader);
     CloseWindow();
     return 0;
 }
