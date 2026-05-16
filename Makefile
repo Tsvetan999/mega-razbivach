@@ -27,6 +27,7 @@
 PROJECT_NAME       ?= game
 RAYLIB_VERSION     ?= 5.1-dev
 RAYLIB_PATH        ?= ..\..
+BUILD_MODE            ?= RELEASE
 
 # Define compiler path on Windows
 COMPILER_PATH      ?= C:/raylib/w64devkit/bin
@@ -53,7 +54,6 @@ RAYLIB_H_INSTALL_PATH ?= $(DESTDIR)/include
 RAYLIB_LIBTYPE        ?= STATIC
 
 # Build mode for project: DEBUG or RELEASE
-BUILD_MODE            ?= RELEASE
 
 # Use external GLFW library instead of rglfw module
 # TODO: Review usage on Linux. Target version of choice. Switch on -lglfw or -lglfw3
@@ -207,7 +207,7 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     ifeq ($(PLATFORM_OS),WINDOWS)
         # resource file contains windows executable icon and properties
         # -Wl,--subsystem,windows hides the console window
-        CFLAGS += $(RAYLIB_PATH)/src/raylib.rc.data -Wl,--subsystem,windows
+        CFLAGS += $(RAYLIB_PATH)/src/raylib.rc.data # -Wl,--subsystem,windows
     endif
     ifeq ($(PLATFORM_OS),LINUX)
         ifeq ($(RAYLIB_LIBTYPE),STATIC)
@@ -273,7 +273,7 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
 endif
 
 # Define library paths containing required libs.
-LDFLAGS = -L. -L$(RAYLIB_RELEASE_PATH) -L$(RAYLIB_PATH)/src
+LDFLAGS = -L. -L$(RAYLIB_RELEASE_PATH) -L$(RAYLIB_PATH)/src  
 
 ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     ifeq ($(PLATFORM_OS),BSD)
