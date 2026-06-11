@@ -7,6 +7,7 @@
 #define CROUCH_SPEED     5.0f
 #define JUMP_FORCE      12.0f
 #define MAX_ACCEL      150.0f
+#define NEW 69
 
 #define FRICTION         0.86f
 
@@ -60,7 +61,7 @@ int main(void)
     const int screenWidth = 800;
     const int screenHeight = 450;
 
-    InitWindow(screenWidth, screenHeight, "raylib [core] example - 3d camera fps");
+    InitWindow(screenWidth, screenHeight, "3d");
 
     Camera camera = { 0 };
     camera.fovy = 60.0f;
@@ -72,15 +73,15 @@ int main(void)
     };
 
     
-    UpdateCameraFPS(&camera); // Update camera parameters
+    UpdateCameraFPS(&camera); 
 
-    DisableCursor();        // Limit cursor to relative movement inside the window
+    DisableCursor();        
 
-    SetTargetFPS(60);       // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);       
 
 
 
-    while (!WindowShouldClose())    // Detect window close button or ESC key
+    while (!WindowShouldClose())    
     {
         Vector2 mouseDelta = GetMouseDelta();
         lookRotation.x -= mouseDelta.x*sensitivity.x;
@@ -170,7 +171,7 @@ void UpdateBody(Body *body, float rot, char side, char forward, bool jumpPressed
     Vector2 input = (Vector2){ (float)side, (float)-forward };
 
 #if defined(NORMALIZE_INPUT)
-    // Slow down diagonal movement
+    
     if ((side != 0) && (forward != 0)) input = Vector2Normalize(input);
 #endif
 
@@ -183,9 +184,7 @@ void UpdateBody(Body *body, float rot, char side, char forward, bool jumpPressed
         body->velocity.y = JUMP_FORCE;
         body->isGrounded = false;
 
-        // Sound can be played at this moment
-        //SetSoundPitch(fxJump, 1.0f + (GetRandomValue(-100, 100)*0.001));
-        //PlaySound(fxJump);
+        
     }
 
     Vector3 front = (Vector3){ sinf(rot), 0.f, cosf(rot) };
@@ -283,7 +282,7 @@ static void DrawLevel(void)
     {
         for (int x = -floorExtent; x < floorExtent; x++)
         {
-            if ((y & 1) && (x & 1))
+            if ((y & 1) && (x & 1)) 
             {
                 DrawPlane((Vector3){ x*tileSize, 0.0f, y*tileSize}, (Vector2){ tileSize, tileSize }, tileColor1);
             }
