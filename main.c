@@ -324,7 +324,5 @@ void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball *fireballs, 
     fb.isDead = false;
 
     fireballs[*fireballCount] = fb;
-    
-    *fireballCount++;
 
 }
