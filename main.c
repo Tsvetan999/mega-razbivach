@@ -34,6 +34,12 @@ typedef struct {
     bool isDead;
 } Fireball;
 
+typedef struct {
+    Vector3 position;
+    float radius;
+    bool isTalking;
+} NPC;
+
 static Vector2 sensitivity = { 0.001f, 0.001f };
 static Body player = { 0 };
 static Vector2 lookRotation = { 0 };
@@ -41,6 +47,15 @@ static float headTimer = 0.0f;
 static float walkLerp = 0.0f;
 static float headLerp = STAND_HEIGHT;
 static Vector2 lean = { 0 };
+
+// ГЛОБАЛНИ ПРОМЕНЛИВИ ЗА МАГИИТЕ И СЪСТОЯНИЯТА
+static int activeSpellIndex = -1; // -1 означава, че няма избрана магия (unbinded)
+static bool spellbookOpen = false;
+static NPC ceci = { { 0.0f, 0.0f, -5.0f }, 3.5f, false }; // Лилав стълб пред играча
+
+void UpdateNPCAndSpellbook(Vector3 playerPos);
+void DrawNPC3D(void);
+void DrawNPCAndSpellbook2D(void);
 
 // Нови променливи за звук и състояние на играта
 static Sound soundStep;
@@ -95,21 +110,33 @@ int main(void)
         // Превключване на Пауза чрез ESC
         if (IsKeyPressed(KEY_ESCAPE)) {
             isPaused = !isPaused;
-            if (isPaused) EnableCursor(); // Показваме мишката в менюто
-            else DisableCursor();        // Скриваме я обратно в играта
+            if (isPaused) EnableCursor();
+            else if (!ceci.isTalking && !spellbookOpen) DisableCursor();
         }
 
+        // Обновяваме Цеци и книгата винаги, за да може мишката да работи правилно
+        UpdateNPCAndSpellbook(player.position);
+
         if (!isPaused) {
-            Vector2 mouseDelta = GetMouseDelta();
-            lookRotation.x -= mouseDelta.x * sensitivity.x;
-            lookRotation.y += mouseDelta.y * sensitivity.y;
+            // Движението на камерата с мишката работи само ако прозорците на менютата са затворени
+            if (!ceci.isTalking && !spellbookOpen) {
+                Vector2 mouseDelta = GetMouseDelta();
+                lookRotation.x -= mouseDelta.x * sensitivity.x;
+                lookRotation.y += mouseDelta.y * sensitivity.y;
+            }
 
             char sideway = (IsKeyDown(KEY_D) - IsKeyDown(KEY_A));
             char forward = (IsKeyDown(KEY_W) - IsKeyDown(KEY_S));
             bool crouching = IsKeyDown(KEY_LEFT_SHIFT);
 
-            bool jumpPressed = IsKeyPressed(KEY_SPACE);
-            // Възпроизвеждане на звук при скок
+            // dokato ceci govori i bogovete mulchat! 
+            if (ceci.isTalking || spellbookOpen) {
+                sideway = 0;
+                forward = 0;
+                crouching = false;
+            }
+
+            bool jumpPressed = IsKeyPressed(KEY_SPACE) && !ceci.isTalking && !spellbookOpen;
             if (jumpPressed && player.isGrounded) PlaySound(soundJump);
 
             UpdateBody(&player, lookRotation.x, sideway, forward, jumpPressed, crouching);
@@ -128,10 +155,9 @@ int main(void)
                 walkLerp = Lerp(walkLerp, 1.0f, 10.0f * delta);
                 camera.fovy = Lerp(camera.fovy, 55.0f, 5.0f * delta);
 
-                // Звук от тичане (само ако не сме клекнали)
                 if (!crouching) {
                     stepSoundTimer += delta;
-                    if (stepSoundTimer >= 0.4f) { // На всеки 0.4 секунди стъпка
+                    if (stepSoundTimer >= 0.4f) {
                         PlaySound(soundStep);
                         stepSoundTimer = 0.0f;
                     }
@@ -146,7 +172,8 @@ int main(void)
             lean.x = Lerp(lean.x, sideway * 0.02f, 10.0f * delta);
             lean.y = Lerp(lean.y, forward * 0.015f, 10.0f * delta);
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            // Стреля само ако активната магия е Fireball (0) и менютата са затворени
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && activeSpellIndex == 0 && !ceci.isTalking && !spellbookOpen) {
                 ShootFireball(&camera, player.position, fireballs, &fireballCount);
             }
 
@@ -161,20 +188,16 @@ int main(void)
             UpdateCameraFPS(&camera);
         }
         else {
-            // Логика за кликане в менюто на пауза
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 Vector2 mousePos = GetMousePosition();
 
-                // Бутон за Fullscreen / Windowed
                 if (CheckCollisionPointRec(mousePos, (Rectangle) { screenWidth / 2 - 100, screenHeight / 2 - 60, 200, 40 })) {
                     ToggleFullscreen();
                 }
-                // Бутон за увеличаване на звука (+)
                 if (CheckCollisionPointRec(mousePos, (Rectangle) { screenWidth / 2 - 60, screenHeight / 2, 40, 40 })) {
                     masterVolume = Clamp(masterVolume + 0.1f, 0.0f, 1.0f);
                     SetMasterVolume(masterVolume);
                 }
-                // Бутон за намаляване на звука (-)
                 if (CheckCollisionPointRec(mousePos, (Rectangle) { screenWidth / 2 + 20, screenHeight / 2, 40, 40 })) {
                     masterVolume = Clamp(masterVolume - 0.1f, 0.0f, 1.0f);
                     SetMasterVolume(masterVolume);
@@ -192,7 +215,14 @@ int main(void)
             }
         }
         DrawLevel();
+
+        // В 3D режима рисуваме САМО тялото на Цеци
+        DrawNPC3D();
+
         EndMode3D();
+
+        // Рисуване на интерфейса и книгата ДИРЕКТНО върху екрана (2D)
+        DrawNPCAndSpellbook2D();
 
         // Основен интерфейс (Инфо панел)
         DrawRectangle(5, 5, 200, 60, Fade(SKYBLUE, 0.5f));
@@ -201,43 +231,38 @@ int main(void)
         DrawText(TextFormat("- Speed: (%05.2f)", Vector2Length((Vector2) { player.velocity.x, player.velocity.z })), 15, 25, 10, BLACK);
         DrawText("Press H for Controls Help", 15, 40, 10, DARKGRAY);
 
-        // Рисуване на Помощния екран (Покриващ панел)
         if (showHelp) {
-            DrawRectangle(screenWidth / 2 - 200, screenHeight / 2 - 150, 400, 220, Fade(BLACK, 0.8f));
-            DrawRectangleLines(screenWidth / 2 - 200, screenHeight / 2 - 150, 400, 220, WHITE);
+            // Увеличена височина на 250 (преди беше 220), за да има място за новия ред
+            DrawRectangle(screenWidth / 2 - 200, screenHeight / 2 - 150, 400, 250, Fade(BLACK, 0.8f));
+            DrawRectangleLines(screenWidth / 2 - 200, screenHeight / 2 - 150, 400, 250, WHITE);
+
             DrawText("GAME CONTROLS", screenWidth / 2 - 60, screenHeight / 2 - 130, 16, ORANGE);
             DrawText("- WASD: Move Player", screenWidth / 2 - 160, screenHeight / 2 - 90, 14, WHITE);
             DrawText("- Left Click: Shoot Fireball", screenWidth / 2 - 160, screenHeight / 2 - 60, 14, WHITE);
             DrawText("- Space: Jump", screenWidth / 2 - 160, screenHeight / 2 - 30, 14, WHITE);
             DrawText("- Left Shift: Crouch", screenWidth / 2 - 160, screenHeight / 2, 14, WHITE);
-            DrawText("- ESC: Pause / Settings Menu", screenWidth / 2 - 160, screenHeight / 2 + 30, 14, WHITE);
+            DrawText("- P: Open Spellbook Menu", screenWidth / 2 - 160, screenHeight / 2 + 30, 14, WHITE); // НОВИЯТ РЕД
+            DrawText("- ESC: Pause / Settings Menu", screenWidth / 2 - 160, screenHeight / 2 + 60, 14, WHITE); // Преместен малко по-надолу (+60 вместо +30)
         }
 
-        // Рисуване на Менюто при Пауза
         if (isPaused) {
             DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.5f));
             DrawRectangle(screenWidth / 2 - 150, screenHeight / 2 - 120, 300, 240, RAYWHITE);
             DrawRectangleLines(screenWidth / 2 - 150, screenHeight / 2 - 120, 300, 240, BLUE);
-
             DrawText("GAME PAUSED", screenWidth / 2 - 60, screenHeight / 2 - 100, 16, BLACK);
 
-            // Рендериране на Бутоните
             DrawRectangle(screenWidth / 2 - 100, screenHeight / 2 - 60, 200, 40, LIGHTGRAY);
             DrawText("Toggle Fullscreen", screenWidth / 2 - 75, screenHeight / 2 - 50, 14, BLACK);
-
             DrawRectangle(screenWidth / 2 - 60, screenHeight / 2, 40, 40, LIGHTGRAY);
             DrawText("+", screenWidth / 2 - 45, screenHeight / 2 + 10, 20, BLACK);
-
             DrawRectangle(screenWidth / 2 + 20, screenHeight / 2, 40, 40, LIGHTGRAY);
             DrawText("-", screenWidth / 2 + 35, screenHeight / 2 + 10, 20, BLACK);
-
             DrawText(TextFormat("Volume: %d%%", (int)(masterVolume * 100)), screenWidth / 2 - 50, screenHeight / 2 + 60, 14, BLACK);
         }
 
         EndDrawing();
     }
 
-    // Изчистване на паметта
     UnloadSound(soundStep);
     UnloadSound(soundJump);
     UnloadSound(soundFireball);
@@ -323,14 +348,9 @@ void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball* fireballs, 
     }
 }
 
-
-
-// THE SOUNDS!!! razboti kato direktna stoinost kum kolonata/slushalkite, shte podleji na budeshti promeni
 void InitCustomGameSounds(Sound* step, Sound* jump, Sound* fireball) {
-    // Безопасен начин за генериране на базови софтуерни звукови вълни без външни функции
     int sampleRate = 44100;
 
-    // 1. Звук за стъпка (Кратък импулс)
     int samplesStep = sampleRate * 0.1f;
     short* dataStep = (short*)malloc(samplesStep * sizeof(short));
     for (int i = 0; i < samplesStep; i++) dataStep[i] = (i % 100 < 50) ? 4000 : -4000;
@@ -338,7 +358,6 @@ void InitCustomGameSounds(Sound* step, Sound* jump, Sound* fireball) {
     *step = LoadSoundFromWave(waveStep);
     free(dataStep);
 
-    // 2. Звук за скок (По-висок тон)
     int samplesJump = sampleRate * 0.15f;
     short* dataJump = (short*)malloc(samplesJump * sizeof(short));
     for (int i = 0; i < samplesJump; i++) dataJump[i] = (i % 60 < 30) ? 6000 : -6000;
@@ -346,11 +365,113 @@ void InitCustomGameSounds(Sound* step, Sound* jump, Sound* fireball) {
     *jump = LoadSoundFromWave(waveJump);
     free(dataJump);
 
-    // 3. Звук за fireball (Дълъг и плътен тон)
     int samplesFire = sampleRate * 0.25f;
     short* dataFire = (short*)malloc(samplesFire * sizeof(short));
     for (int i = 0; i < samplesFire; i++) dataFire[i] = (i % 40 < 20) ? 8000 : -8000;
     Wave waveFire = { samplesFire, sampleRate, 16, 1, dataFire };
     *fireball = LoadSoundFromWave(waveFire);
     free(dataFire);
+}
+
+// --- СИСТЕМА ЗА NPC (CECI) И SPELLBOOK (МАГИИ) ---
+
+static const char* spellNames[10] = {
+    "Fireball", "Frostbolt", "Lightning", "Heal", "Shield",
+    "Teleport", "Poison", "Invisibility", "Blizzard", "Meteor"
+};
+
+void UpdateNPCAndSpellbook(Vector3 playerPos) {
+    if (isPaused) return;
+
+    // 1. Интеракция с Ceci (клавиш E)
+    float distance = Vector3Distance(playerPos, ceci.position);
+    if (distance <= ceci.radius && IsKeyPressed(KEY_E)) {
+        ceci.isTalking = !ceci.isTalking;
+        if (ceci.isTalking) {
+            spellbookOpen = false; // Затваряме книгата, ако говорим с Цеци
+            EnableCursor();
+        }
+        else {
+            DisableCursor();
+        }
+    }
+
+    if (distance > ceci.radius && ceci.isTalking) {
+        ceci.isTalking = false;
+        if (!spellbookOpen) DisableCursor();
+    }
+
+    // 2. Отваряне на Книгата (клавиш P)
+    if (IsKeyPressed(KEY_P)) {
+        spellbookOpen = !spellbookOpen;
+        if (spellbookOpen) {
+            ceci.isTalking = false; // Затваряме диалога, ако отворим книгата
+            EnableCursor();
+        }
+        else {
+            DisableCursor();
+        }
+    }
+
+    // 3. Кликане по магиите
+    if (spellbookOpen && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        Vector2 mousePos = GetMousePosition();
+        int startX = 400;
+        int startY = 250;
+
+        for (int i = 0; i < 10; i++) {
+            Rectangle spellRect = { startX, startY + i * 45, 250, 35 };
+            if (CheckCollisionPointRec(mousePos, spellRect)) {
+                if (activeSpellIndex == i) activeSpellIndex = -1; // Unbind
+                else activeSpellIndex = i;  // Bind
+                break;
+            }
+        }
+    }
+}
+
+void DrawNPC3D(void) {
+    DrawCylinder(ceci.position, 0.5f, 0.5f, 2.0f, 16, PURPLE);
+    DrawCylinderWires(ceci.position, 0.5f, 0.5f, 2.0f, 16, DARKPURPLE);
+}
+
+void DrawNPCAndSpellbook2D(void) {
+    if (ceci.isTalking) {
+        int boxW = 850;
+        int boxH = 150;
+        int boxX = GetScreenWidth() / 2 - boxW / 2;
+        int boxY = GetScreenHeight() - boxH - 50;
+
+        DrawRectangle(boxX, boxY, boxW, boxH, Fade(BLACK, 0.85f));
+        DrawRectangleLines(boxX, boxY, boxW, boxH, PURPLE);
+
+        DrawText("Ceci the Great Wizard:", boxX + 20, boxY + 15, 18, ORANGE);
+        DrawText("Hello traveler, i am Ceci the Great Wizard! The first thing you will", boxX + 20, boxY + 45, 15, WHITE);
+        DrawText("need to learn in order to fight against the evil forces of Vidin", boxX + 20, boxY + 65, 15, WHITE);
+        DrawText("is going to be the simple spell called : Fireball . Open your", boxX + 20, boxY + 85, 15, WHITE);
+        DrawText("Spellbook by pressing P. By clicking on the fireball you bind it to your Left Click.", boxX + 20, boxY + 105, 15, WHITE);
+    }
+
+    if (spellbookOpen) {
+        int startX = 400;
+        int startY = 250;
+
+        DrawRectangle(startX - 20, startY - 40, 350, 480, Fade(DARKGRAY, 0.95f));
+        DrawRectangleLines(startX - 20, startY - 40, 350, 480, GOLD);
+        DrawText("SPELLBOOK (P)", startX + 80, startY - 25, 18, GOLD);
+
+        for (int i = 0; i < 10; i++) {
+            int currentY = startY + i * 45;
+            bool isSelected = (activeSpellIndex == i);
+
+            Color boxColor = isSelected ? GOLD : LIGHTGRAY;
+            Color textColor = isSelected ? YELLOW : WHITE;
+
+            DrawRectangle(startX, currentY, 35, 35, boxColor);
+            DrawRectangleLines(startX, currentY, 35, 35, BLACK);
+
+            DrawText(TextFormat("%d", i + 1), startX + 13, currentY + 10, 14, BLACK);
+            DrawText(spellNames[i], startX + 55, currentY + 10, 16, textColor);
+        }
+    }
 }
