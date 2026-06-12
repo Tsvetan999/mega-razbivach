@@ -1,5 +1,6 @@
 ﻿#include "raylib.h"
 #include "raymath.h"
+#include <stdlib.h> // Необходимо за заделяне на аудио данни
 
 #define GRAVITY         32.0f
 #define MAX_SPEED       20.0f
@@ -52,6 +53,7 @@ static bool isPaused = false;
 static bool showHelp = false;
 
 void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball* fireballs, int* fireballcount);
+void InitCustomGameSounds(Sound* step, Sound* jump, Sound* fireball);
 static void DrawLevel(void);
 static void UpdateCameraFPS(Camera* camera);
 static void UpdateBody(Body* body, float rot, char side, char forward, bool jumpPressed, bool crouchHold);
@@ -62,13 +64,11 @@ int main(void)
     const int screenHeight = 960;
 
     InitWindow(screenWidth, screenHeight, "3d Game");
-    SetExitKey(KEY_NULL);
+    SetExitKey(KEY_NULL); // Спира затварянето на прозореца от ESC
 
-    // Инициализиране на аудио системата
+    // Инициализиране на аудио системата и вградените звуци
     InitAudioDevice();
-    soundStep = LoadSound("step.wav");
-    soundJump = LoadSound("jump.wav");
-    soundFireball = LoadSound("fireball.wav");
+    InitCustomGameSounds(&soundStep, &soundJump, &soundFireball);
     SetMasterVolume(masterVolume);
 
     Camera camera = { 0 };
@@ -247,7 +247,6 @@ int main(void)
     return 0;
 }
 
-// Функциите UpdateBody, UpdateCameraFPS и DrawLevel остават същите...
 void UpdateBody(Body* body, float rot, char side, char forward, bool jumpPressed, bool crouchHold) {
     Vector2 input = (Vector2){ (float)side, (float)-forward };
     float delta = GetFrameTime();
@@ -309,18 +308,49 @@ static void DrawLevel(void) {
     DrawSphere((Vector3) { 300.0f, 300.0f, 0.0f }, 100.0f, (Color) { 255, 0, 0, 255 });
 }
 
-// Функцията за стреляне е поставена най-отдолу, за да я следите лесно
 void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball* fireballs, int* fireballcount) {
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
     Fireball fb = { 0 };
     fb.position = Vector3Add(playerPosition, Vector3Scale(forward, 1.5f));
-    fb.velocity = Vector3Scale(forward, 25.0f); // Малко по-бърза за по-добро усещане
+    fb.velocity = Vector3Scale(forward, 25.0f);
     fb.lifetime = 3.0f;
     fb.isDead = false;
 
     if (*fireballcount < MAX_FIREBALLS) {
         fireballs[*fireballcount] = fb;
         (*fireballcount)++;
-        PlaySound(soundFireball); // Пуска звук при успешно изстрелване
+        PlaySound(soundFireball);
     }
+}
+
+
+
+// THE SOUNDS!!! razboti kato direktna stoinost kum kolonata/slushalkite, shte podleji na budeshti promeni
+void InitCustomGameSounds(Sound* step, Sound* jump, Sound* fireball) {
+    // Безопасен начин за генериране на базови софтуерни звукови вълни без външни функции
+    int sampleRate = 44100;
+
+    // 1. Звук за стъпка (Кратък импулс)
+    int samplesStep = sampleRate * 0.1f;
+    short* dataStep = (short*)malloc(samplesStep * sizeof(short));
+    for (int i = 0; i < samplesStep; i++) dataStep[i] = (i % 100 < 50) ? 4000 : -4000;
+    Wave waveStep = { samplesStep, sampleRate, 16, 1, dataStep };
+    *step = LoadSoundFromWave(waveStep);
+    free(dataStep);
+
+    // 2. Звук за скок (По-висок тон)
+    int samplesJump = sampleRate * 0.15f;
+    short* dataJump = (short*)malloc(samplesJump * sizeof(short));
+    for (int i = 0; i < samplesJump; i++) dataJump[i] = (i % 60 < 30) ? 6000 : -6000;
+    Wave waveJump = { samplesJump, sampleRate, 16, 1, dataJump };
+    *jump = LoadSoundFromWave(waveJump);
+    free(dataJump);
+
+    // 3. Звук за fireball (Дълъг и плътен тон)
+    int samplesFire = sampleRate * 0.25f;
+    short* dataFire = (short*)malloc(samplesFire * sizeof(short));
+    for (int i = 0; i < samplesFire; i++) dataFire[i] = (i % 40 < 20) ? 8000 : -8000;
+    Wave waveFire = { samplesFire, sampleRate, 16, 1, dataFire };
+    *fireball = LoadSoundFromWave(waveFire);
+    free(dataFire);
 }
