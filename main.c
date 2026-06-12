@@ -7,7 +7,6 @@
 #define CROUCH_SPEED     5.0f
 #define JUMP_FORCE      12.0f
 #define MAX_ACCEL      150.0f
-#define NEW 69
 
 #define FRICTION         0.86f
 
@@ -37,9 +36,7 @@ typedef struct {
     bool isDead;
 } Fireball;
 
-Fireball fireballs[MAX_FIREBALLS] = {0};
 
-int fireballCount = 0;
 
 
 static Vector2 sensitivity = { 0.001f, 0.001f };
@@ -51,15 +48,15 @@ static float walkLerp = 0.0f;
 static float headLerp = STAND_HEIGHT;
 static Vector2 lean = { 0 };
 
-void ShootFireball(Camera *camera, Vector3 playerposition); 
+void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball *fireballs, int *fireballcount);
 static void DrawLevel(void);
 static void UpdateCameraFPS(Camera *camera);
 static void UpdateBody(Body *body, float rot, char side, char forward, bool jumpPressed, bool crouchHold);
 
 int main(void)
 {
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+    const int screenWidth = 1600;
+    const int screenHeight = 960;
 
     InitWindow(screenWidth, screenHeight, "3d");
 
@@ -72,6 +69,9 @@ int main(void)
         player.position.z,
     };
 
+    Fireball fireballs[MAX_FIREBALLS] = { 0 };
+
+    int fireballCount = 0;
     
     UpdateCameraFPS(&camera); 
 
@@ -116,7 +116,8 @@ int main(void)
         lean.y = Lerp(lean.y, forward*0.015f, 10.0f*delta);
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            ShootFireball(&camera, player.position);
+            ShootFireball(&camera, player.position, fireballs, &fireballCount);
+            fireballCount++;
         }
 
         for (int i = 0; i < fireballCount; i++) {
@@ -143,19 +144,17 @@ int main(void)
             BeginMode3D(camera);
                 for (int i = 0; i < fireballCount; i++) {
                     if (!fireballs[i].isDead) {
-                        DrawSphere(fireballs[i].position, 0.1f, RED);
+                        DrawSphere(fireballs[i].position, 1.0f, RED);
                     }
                 }
                 DrawLevel();
             EndMode3D();
 
-            DrawRectangle(5, 5, 330, 75, Fade(SKYBLUE, 0.5f));
-            DrawRectangleLines(5, 5, 330, 75, BLUE);
+            DrawRectangle(5, 5, 150, 40, Fade(SKYBLUE, 0.5f));
+            DrawRectangleLines(5, 5, 150, 40, BLUE);
 
-            DrawText("Camera controls:", 15, 15, 10, BLACK);
-            DrawText("- Move keys: W, A, S, D, Space, Left-Shift", 15, 30, 10, BLACK);
-            DrawText("- Look around: arrow keys or mouse", 15, 45, 10, BLACK);
-            DrawText(TextFormat("- Velocity Len: (%06.3f)", Vector2Length((Vector2){ player.velocity.x, player.velocity.z })), 15, 60, 10, BLACK);
+            DrawText(TextFormat("- Fireball Count: (%d)", fireballCount), 15, 10, 10, BLACK);
+            DrawText(TextFormat("- Velocity Len:   (%06.3f)", Vector2Length((Vector2){ player.velocity.x, player.velocity.z })), 15, 30, 10, BLACK);
 
         EndDrawing();
     }
@@ -316,14 +315,16 @@ static void DrawLevel(void)
     DrawSphere((Vector3){ 300.0f, 300.0f, 0.0f }, 100.0f, (Color){ 255, 0, 0, 255 });
 }
 
-void ShootFireball(Camera* camera, Vector3 playerPosition) {
+void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball *fireballs, int* fireballCount) {
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
     Fireball fb = {0};
     fb.position = Vector3Add(playerPosition, Vector3Scale(forward, 1.5f));
-    fb.velocity = Vector3Scale(forward, 10.0f);
+    fb.velocity = Vector3Scale(forward, 20.0f);
     fb.lifetime = 3.0f;
     fb.isDead = false;
 
-    fireballs[fireballCount] = fb;
+    fireballs[*fireballCount] = fb;
+    
+    *fireballCount++;
 
 }
