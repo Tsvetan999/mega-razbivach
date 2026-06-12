@@ -1,4 +1,4 @@
-#include "raylib.h"
+﻿#include "raylib.h"
 
 #include "raymath.h"
 
@@ -315,14 +315,17 @@ static void DrawLevel(void)
     DrawSphere((Vector3){ 300.0f, 300.0f, 0.0f }, 100.0f, (Color){ 255, 0, 0, 255 });
 }
 
-void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball *fireballs, int* fireballCount) {
+void ShootFireball(Camera* camera, Vector3 playerPosition, Fireball* fireballs, int* fireballcount) {
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
-    Fireball fb = {0};
+    Fireball fb = { 0 };
     fb.position = Vector3Add(playerPosition, Vector3Scale(forward, 1.5f));
-    fb.velocity = Vector3Scale(forward, 20.0f);
+    fb.velocity = Vector3Scale(forward, 10.0f);
     fb.lifetime = 3.0f;
     fb.isDead = false;
 
-    fireballs[*fireballCount] = fb;
-
+    // Използваме *fireballcount, за да променим оригиналната променлива в main
+    if (*fireballcount < MAX_FIREBALLS) {
+        fireballs[*fireballcount] = fb;
+        (*fireballcount)++;
+    }
 }
